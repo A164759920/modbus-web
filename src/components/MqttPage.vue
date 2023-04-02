@@ -1,9 +1,14 @@
 <template>
     <div class="container">
         <div class="body">
+            <div class="pre-header">
+                <div class="connect-status" :class="setConnectStatus"></div>
+                发酵罐远程监控软件
+            </div>
             <div class="header">
                 <div class="header-text">当前发酵罐</div>
                 <input type="text" class="header-input" v-model="client.deviceName">
+                <div class="connect-button" @click="getDeviceByName">连接</div>
             </div>
             <div class="control-body">
                 <div class="row">
@@ -33,7 +38,7 @@
                     </div>
                     <div class="row-content">
                         <div class="content-name">系统状态</div>
-                        <div class="content-data">1</div>
+                        <div class="content-data">{{ setDeviceState }}</div>
                     </div>
                 </div>
                 <div class="staterow">
@@ -66,7 +71,6 @@
                 <div class="footer">
                     <div class="button" @click="updateControlState('0')">本地控制</div>
                     <div class="button" @click="updateControlState('1')">远程控制</div>
-
                 </div>
             </div>
         </div>
@@ -90,10 +94,14 @@ export default {
             whiskState: "",
             DOMAIN: "http://127.0.0.1:8888",
             client: {
-                pid: "583419",
-                deviceID: "1059893029",
-                deviceName: "mqtt-can1",
-
+                // onLine: false,
+                // pid: "583419",
+                // deviceID: "1059893029",
+                // deviceName: "mqtt-can1",
+                onLine: false,
+                pid: "",
+                deviceID: "",
+                deviceName: "",
             },
         }
     },
@@ -101,6 +109,12 @@ export default {
         setControlState: function () {
             return this.controlState === "1" ? "远程控制" : "本地控制"
         },
+        setDeviceState: function () {
+            return this.client.onLine ? "开机" : "关机"
+        },
+        setConnectStatus: function () {
+            return this.client.onLine ? `connected` : ``
+        }
 
     },
     methods: {
@@ -108,7 +122,7 @@ export default {
             return stateName === "1" ? "ON" : "OFF"
         },
         /**
-         * 更新控制状态
+         * @description 更新控制状态
          * @param {String} stateCode 
          */
         updateControlState: async function (stateCode) {
@@ -119,7 +133,7 @@ export default {
                         "controlState": stateCode,
                     }
                 })
-                if (res.data.code === "0") {
+                if (res.data.code === 0) {
                     this.controlState = stateCode
                 } else {
                     console.log("切换控制状态失败-1", res.data.data)
@@ -127,46 +141,71 @@ export default {
             } catch (error) {
                 console.log("切换控制状态失败-2", error)
             }
+        },
+        /**
+         * @description 获取传感器数据流
+         */
+        getDataStreamByID: async function () {
+            try {
+                const res = await axios.get(`${this.DOMAIN}/mqtt/getDataStream`,
+                    {
+                        params: {
+                            deviceID: this.client.deviceID
+                        }
+                    }
+                )
+                if (res.data.code === 0) {
+                    const { foam, temperature, pH, oxygen } = res.data.data
+                    this.foam = foam;
+                    this.temperature = temperature;
+                    this.pH = pH;
+                    this.oxygen = oxygen;
+                } else {
+                    console.log("获取数据流失败-1", res.data.data)
+                }
+            } catch (error) {
+                console.log("获取数据流失败-1", error)
+            }
+        },
+        /**
+         * @description 获取设备基本信息
+         */
+        getDeviceByName: async function () {
+            if (this.client.onLine) {
+                this.client.deviceID = "";
+                // this.client.deviceName = "";
+                this.client.pid = "";
+                this.client.onLine = false
+            } else {
+                try {
+                    const res = await axios.get(`${this.DOMAIN}/mqtt/getDevice`,
+                        {
+                            params: {
+                                deviceName: this.client.deviceName
+                            }
+                        }
+                    )
+                    if (res.data.code === 0) {
+                        const { device_id, name, pid } = res.data.data
+                        this.client.deviceID = device_id;
+                        this.client.deviceName = name;
+                        this.client.pid = pid
+                        this.client.onLine = true
+                    } else {
+                        console.log("查询设备失败-1", res.data.data)
+                        window.alert("获取设备失败,请检查设备名")
+                    }
+                } catch (error) {
+                    console.log("查询设备失败-2", error)
+                    window.alert("获取设备失败,请检查设备名")
+                }
+            }
+
         }
     },
 
     mounted: function () {
-        // axios.get(`${this.DOMAIN}/mqtt/getDevice`,
-        //     {
-        //         params: {
-        //             deviceName: this.client.deviceName
-        //         }
-        //     }
-        // ).then((res) => {
-        //     console.log('结果', res.data.data)
-        // }, err => {
-        //     console.log("错误", err)
-        // })
 
-        // axios.get(`${this.DOMAIN}/mqtt/getDataStream`,
-        //     {
-        //         params: {
-        //             deviceID: this.client.deviceID
-        //         }
-        //     }
-        // ).then((res) => {
-        //     const { foam, temperature, pH, oxygen } = res.data.data
-        // }, err => {
-        //     console.log("错误", err)
-        // })
-
-        // axios.post(`${this.DOMAIN}/mqtt/updateImageState`, {
-        //     deviceID: this.client.deviceID,
-        //     newStates: {
-        //         "controlState": "0",
-        //         "coldState": "0"
-        //     }
-        // }).then((res) => {
-        //     const {data} = res.data
-        //     console.log("返回值", data)
-        // }, err => {
-        //     console.log("错误", err)
-        // })
     }
 
 }
@@ -186,11 +225,40 @@ export default {
         align-items: center;
         background-color: white;
         width: 450px;
-        height: 500px;
+        height: 600px;
         border: 1px solid black;
     }
 
+    .pre-header {
+        position: relative;
+        width: 100%;
+        height: 60px;
+        line-height: 60px;
+        text-align: center;
+        font-weight: 530;
+        border-bottom: 1px solid black;
+
+        .connect-status {
+            position: absolute;
+            top: 20px;
+            left: 10px;
+            width: 25px;
+            height: 25px;
+            border-radius: 50%;
+            background-color: red;
+            box-shadow: -1px -1px 4px rgba(255, 255, 255, 0.05),
+                4px 4px 6px rgba(0, 0, 0, 0.2),
+                inset -1px -1px 4px rgba(255, 255, 255, 0.05),
+                inset 1px 1px 1px rgba(0, 0, 0, 0.1);
+        }
+
+        .connected {
+            background-color: green;
+        }
+    }
+
     .header {
+        position: relative;
         display: flex;
         align-items: center;
         width: 100%;
@@ -198,6 +266,23 @@ export default {
         line-height: 40px;
         margin-top: 10px;
         margin-bottom: 10px;
+
+        .connect-button {
+            position: absolute;
+            top: 0px;
+            right: 15px;
+            width: 60px;
+            height: 40px;
+            line-height: 40px;
+            border-radius: 15px;
+            border: rgb(17, 137, 114) solid 3px;
+            background-color: rgb(231, 244, 240);
+            text-align: center;
+        }
+
+        .connect-button:hover {
+            cursor: pointer;
+        }
 
         .header-text {
             margin-left: 15px;
