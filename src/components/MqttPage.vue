@@ -1,5 +1,43 @@
 <template>
     <div class="container">
+        <div class="remote">
+            <div class="remote-header">远程控制器</div>
+            <div class="remote-row">
+                <div class="row-text">加热</div>
+                <div class="row-check">
+                    <div class="check-name"></div>
+                    <input type="checkbox" class="check-box" @change="checkClick('hotState')">
+                </div>
+            </div>
+            <div class="remote-row">
+                <div class="row-text">冷却</div>
+                <div class="row-check">
+                    <div class="check-name"></div>
+                    <input type="checkbox" class="check-box" @change="checkClick('coldState')">
+                </div>
+            </div>
+            <div class="remote-row">
+                <div class="row-text">加酸</div>
+                <div class="row-check">
+                    <div class="check-name"></div>
+                    <input type="checkbox" class="check-box" @change="checkClick('acidState')">
+                </div>
+            </div>
+            <div class="remote-row">
+                <div class="row-text">加碱</div>
+                <div class="row-check">
+                    <div class="check-name"></div>
+                    <input type="checkbox" class="check-box" @change="checkClick('baseState')">
+                </div>
+            </div>
+            <div class="remote-row">
+                <div class="row-text">搅拌</div>
+                <div class="row-check">
+                    <div class="check-name"></div>
+                    <input type="checkbox" class="check-box" @change="checkClick('whiskState')">
+                </div>
+            </div>
+        </div>
         <div class="body">
             <div class="pre-header">
                 <div class="connect-status" :class="setConnectStatus"></div>
@@ -82,16 +120,22 @@ export default {
     name: "MqttPage",
     data: function () {
         return {
+            dataTimer: null,
             temperature: "",
             oxygen: "",
             pH: "",
             foam: "",
             controlState: "",
             hotState: "",
+            temp_hotState: "",
             coldState: "",
+            temp_coldState: "",
             acidState: "",
+            temp_acidState: "",
             baseState: "",
+            temp_baseState: "",
             whiskState: "",
+            temp_whiskState: "",
             DOMAIN: "http://127.0.0.1:8888",
             client: {
                 // onLine: false,
@@ -118,6 +162,31 @@ export default {
 
     },
     methods: {
+        /**
+         * @description 远程控制器选择框事件
+         * @param {String} stateName 
+         */
+        checkClick: function (stateName) {
+            switch (stateName) {
+                case "hotState":
+                    event.target.checked ? this.temp_hotState = "1" : this.temp_hotState = "0"
+                    break;
+                case "coldState":
+                    event.target.checked ? this.temp_coldState = "1" : this.temp_coldState = "0"
+                    break;
+                case "acidState":
+                    event.target.checked ? this.temp_acidState = "1" : this.temp_acidState = "0"
+                    break;
+                case "baseState":
+                    event.target.checked ? this.temp_baseState = "1" : this.temp_baseState = "0"
+                    break;
+                case "whiskState":
+                    event.target.checked ? this.temp_whiskState = "1" : this.temp_whiskState = "0"
+                    break;
+            }
+            console.log('点击了', stateName, event.target.checked)
+        },
+
         setStateText: function (stateName) {
             return stateName === "1" ? "ON" : "OFF"
         },
@@ -140,6 +209,31 @@ export default {
                 }
             } catch (error) {
                 console.log("切换控制状态失败-2", error)
+            }
+        },
+        /**
+         * @description 获取镜像state
+         */
+        getImageStateByID: async function () {
+            try {
+                const res = await axios.get(`${this.DOMAIN}/mqtt/getImageState`, {
+                    params: {
+                        deviceID: this.client.deviceID
+                    }
+                })
+                if (res.data.code === 0) {
+                    const { baseState, hotState, whiskState, acidState, coldState, controlState } = res.data.data
+                    this.baseState = baseState;
+                    this.hotState = hotState;
+                    this.whiskState = whiskState;
+                    this.acidState = acidState;
+                    this.coldState = coldState;
+                    this.controlState = controlState
+                } else {
+                    console.log("获取imageState失败-1", res.data.data)
+                }
+            } catch (error) {
+                console.log("获取imageState失败-1", error)
             }
         },
         /**
@@ -176,6 +270,20 @@ export default {
                 // this.client.deviceName = "";
                 this.client.pid = "";
                 this.client.onLine = false
+                this.temperature = "";
+                this.oxygen = "";
+                this.pH = "";
+                this.foam = "";
+                this.controlState = "";
+                this.hotState = "";
+                this.coldState = "";
+                this.acidState = "";
+                this.baseState = "";
+                this.whiskState = "";
+                // 清除获取数据定时器
+                if (this.dataTimer != null) {
+                    clearInterval(this.dataTimer)
+                }
             } else {
                 try {
                     const res = await axios.get(`${this.DOMAIN}/mqtt/getDevice`,
@@ -191,6 +299,12 @@ export default {
                         this.client.deviceName = name;
                         this.client.pid = pid
                         this.client.onLine = true
+                        // 注册获取数据的定时器
+                        this.dataTimer = setInterval(() => {
+                            this.getDataStreamByID(this.client.id) // 数据流
+                            this.getImageStateByID()    // 镜像
+                            console.log("定时器执行了")
+                        }, 2000);
                     } else {
                         console.log("查询设备失败-1", res.data.data)
                         window.alert("获取设备失败,请检查设备名")
@@ -213,11 +327,51 @@ export default {
 
 <style scoped lang="scss">
 .container {
+    position: relative;
     width: 100%;
     height: 100%;
     background-color: whitesmoke;
     display: flex;
     justify-content: center;
+
+    .remote {
+
+        left: 10px;
+        position: absolute;
+        width: 150px;
+        height: 250px;
+        background-color: white;
+        box-shadow: rgba(60, 64, 67, 0.3) 0px 1px 2px 0px,
+            rgba(60, 64, 67, 0.15) 0px 2px 6px 2px;
+        border-radius: 10px;
+        border-left: 2px solid black;
+        border-right: 2px solid black;
+        border-bottom: 2px solid black;
+
+        .remote-header {
+            border-radius: 10px;
+            border: rgb(17, 137, 114) solid 3px;
+            background-color: rgb(231, 244, 240);
+            height: 30px;
+            line-height: 30px;
+            text-align: center;
+        }
+
+        .remote-row {
+            display: flex;
+            width: 100%;
+            height: 30px;
+            line-height: 30px;
+            margin-bottom: 10px;
+
+
+            .row-text {
+                padding-left: 15px;
+                margin-right: 20px;
+            }
+
+        }
+    }
 
     .body {
         display: flex;
