@@ -1,24 +1,29 @@
 <template>
   <div id="app">
-    <HelloWorld />
+    <!-- <HelloWorld />
+     -->
+    <MqttPage></MqttPage>
   </div>
 </template>
 
 <script>
-import HelloWorld from './components/HelloWorld.vue'
-
+//import HelloWorld from './components/HelloWorld.vue'
+import MqttPage from './components/MqttPage.vue';
 export default {
   name: 'App',
   components: {
-    HelloWorld
+    MqttPage
+    // HelloWorld,
   }
 }
 </script>
 
 <style lang="scss">
-#app,html,body {
+#app,
+html,
+body {
   width: 100%;
   height: 100%;
-  
+
 }
 </style>

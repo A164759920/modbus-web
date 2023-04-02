@@ -43,7 +43,7 @@
 </template>
 
 <script>
-import axios from "axios"
+
 export default {
   name: 'HelloWorld',
   data: function () {
@@ -59,12 +59,12 @@ export default {
       messageList: []
     }
   },
-  computed:{
-    setConnectStatus:function(){
-      if(this.connectedPort!==""){
+  computed: {
+    setConnectStatus: function () {
+      if (this.connectedPort !== "") {
         return `connected`
       }
-      else{
+      else {
         return ``
       }
     }
@@ -190,7 +190,8 @@ export default {
           inset -1px -1px 4px rgba(255, 255, 255, 0.05),
           inset 1px 1px 1px rgba(0, 0, 0, 0.1);
       }
-      .connected{
+
+      .connected {
         background-color: green;
       }
 
@@ -224,7 +225,7 @@ export default {
 
         .connect-button:hover {
           cursor: pointer;
-          box-shadow: #D6D6E7 0 0 0 1.5px inset, rgba(45, 35, 66, 0.4) 0 2px 
+          box-shadow: #D6D6E7 0 0 0 1.5px inset, rgba(45, 35, 66, 0.4) 0 2px
         }
       }
     }
@@ -307,5 +308,6 @@ export default {
       }
     }
   }
-}</style>
+}
+</style>
 
