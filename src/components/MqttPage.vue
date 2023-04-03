@@ -1,40 +1,40 @@
 <template>
     <div class="container">
-        <div class="remote">
+        <div v-drag class="remote">
             <div class="remote-header">远程控制器</div>
             <div class="remote-row">
                 <div class="row-text">加热</div>
                 <div class="row-check">
                     <div class="check-name"></div>
-                    <input type="checkbox" class="check-box" @change="checkClick('hotState')">
+                    <input type="checkbox" class="check-box" @change="checkClick('hotState')" v-model="temp_hotState">
                 </div>
             </div>
             <div class="remote-row">
                 <div class="row-text">冷却</div>
                 <div class="row-check">
                     <div class="check-name"></div>
-                    <input type="checkbox" class="check-box" @change="checkClick('coldState')">
+                    <input type="checkbox" class="check-box" @change="checkClick('coldState')" v-model="temp_coldState">
                 </div>
             </div>
             <div class="remote-row">
                 <div class="row-text">加酸</div>
                 <div class="row-check">
                     <div class="check-name"></div>
-                    <input type="checkbox" class="check-box" @change="checkClick('acidState')">
+                    <input type="checkbox" class="check-box" @change="checkClick('acidState')" v-model="temp_acidState">
                 </div>
             </div>
             <div class="remote-row">
                 <div class="row-text">加碱</div>
                 <div class="row-check">
                     <div class="check-name"></div>
-                    <input type="checkbox" class="check-box" @change="checkClick('baseState')">
+                    <input type="checkbox" class="check-box" @change="checkClick('baseState')" v-model="temp_baseState">
                 </div>
             </div>
             <div class="remote-row">
                 <div class="row-text">搅拌</div>
                 <div class="row-check">
                     <div class="check-name"></div>
-                    <input type="checkbox" class="check-box" @change="checkClick('whiskState')">
+                    <input type="checkbox" class="check-box" @change="checkClick('whiskState')" v-model="temp_whiskState">
                 </div>
             </div>
         </div>
@@ -145,7 +145,7 @@ export default {
                 onLine: false,
                 pid: "",
                 deviceID: "",
-                deviceName: "",
+                deviceName: "mqtt-can1",
             },
         }
     },
@@ -167,24 +167,53 @@ export default {
          * @param {String} stateName 
          */
         checkClick: function (stateName) {
-            switch (stateName) {
-                case "hotState":
-                    event.target.checked ? this.temp_hotState = "1" : this.temp_hotState = "0"
-                    break;
-                case "coldState":
-                    event.target.checked ? this.temp_coldState = "1" : this.temp_coldState = "0"
-                    break;
-                case "acidState":
-                    event.target.checked ? this.temp_acidState = "1" : this.temp_acidState = "0"
-                    break;
-                case "baseState":
-                    event.target.checked ? this.temp_baseState = "1" : this.temp_baseState = "0"
-                    break;
-                case "whiskState":
-                    event.target.checked ? this.temp_whiskState = "1" : this.temp_whiskState = "0"
-                    break;
+            // 远程控制是才可使用
+            if (this.client.onLine && this.controlState === "1") {
+                switch (stateName) {
+                    case "hotState":
+                        if (event.target.checked) {
+                            this.updateImageState({ "hotState": "1" })
+                        } else {
+                            this.updateImageState({ "hotState": "0" })
+                        }
+
+                        break;
+                    case "coldState":
+                        if (event.target.checked) {
+                            this.updateImageState({ "coldState": "1" })
+                        } else {
+                            this.updateImageState({ "coldState": "0" })
+                        }
+
+                        break;
+                    case "acidState":
+                        if (event.target.checked) {
+                            this.updateImageState({ "acidState": "1" })
+                        } else {
+                            this.updateImageState({ "acidState": "0" })
+                        }
+
+                        break;
+                    case "baseState":
+                        if (event.target.checked) {
+                            this.updateImageState({ "baseState": "1" })
+                        } else {
+                            this.updateImageState({ "baseState": "0" })
+                        }
+
+                        break;
+                    case "whiskState":
+                        if (event.target.checked) {
+                            this.updateImageState({ "whiskState": "1" })
+                        } else {
+                            this.updateImageState({ "whiskState": "0" })
+                        }
+
+                        break;
+                }
+            } else {
+                console.log("本地控制模式")
             }
-            console.log('点击了', stateName, event.target.checked)
         },
 
         setStateText: function (stateName) {
@@ -211,8 +240,23 @@ export default {
                 console.log("切换控制状态失败-2", error)
             }
         },
+        updateImageState: async function (stateObj) {
+            try {
+                const res = await axios.post(`${this.DOMAIN}/mqtt/updateImageState`, {
+                    deviceID: this.client.deviceID,
+                    newStates: stateObj
+                })
+                if (res.data.code === 0) {
+                    console.log("更新镜像状态成功", res.data.data)
+                } else {
+                    console.log("更新镜像状态失败-1", res.data.data)
+                }
+            } catch (error) {
+                console.log("更新镜像状态失败-2", error)
+            }
+        },
         /**
-         * @description 获取镜像state
+         * @description 获取镜像state的reported字段
          */
         getImageStateByID: async function () {
             try {
@@ -221,6 +265,7 @@ export default {
                         deviceID: this.client.deviceID
                     }
                 })
+                console.log(res.data)
                 if (res.data.code === 0) {
                     const { baseState, hotState, whiskState, acidState, coldState, controlState } = res.data.data
                     this.baseState = baseState;
@@ -229,6 +274,13 @@ export default {
                     this.acidState = acidState;
                     this.coldState = coldState;
                     this.controlState = controlState
+                    if (this.controlState === "1") {
+                        this.temp_hotState = hotState === "1" ? true : false
+                        this.temp_coldState = coldState === "1" ? true : false
+                        this.temp_acidState = acidState === "1" ? true : false
+                        this.temp_baseState = baseState === "1" ? true : false
+                        this.temp_whiskState = whiskState === "1" ? true : false
+                    }
                 } else {
                     console.log("获取imageState失败-1", res.data.data)
                 }
@@ -302,7 +354,7 @@ export default {
                         // 注册获取数据的定时器
                         this.dataTimer = setInterval(() => {
                             this.getDataStreamByID(this.client.id) // 数据流
-                            this.getImageStateByID()    // 镜像
+                            this.getImageStateByID(this.client.id)    // 镜像
                             console.log("定时器执行了")
                         }, 2000);
                     } else {
@@ -335,7 +387,11 @@ export default {
     justify-content: center;
 
     .remote {
-
+        z-index: 3;
+        -webkit-user-select: none;
+        -ms-user-select: none;
+        -moz-user-select: -moz-none;
+        cursor: pointer;
         left: 10px;
         position: absolute;
         width: 150px;
